@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name    Survey Test Helper
 // @author  Elliot Kwan
-// @version 2.32.2
+// @version 2.33.3
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
 // @include /^https?:\/\/.+\.(com|net)\/index\.php(\/survey\/.*|\?r=.+)/
 // @include /^https?:\/\/.+\.(com|net)\/index\.php(\/[0-9]{6}.*|\?r=.+)/
+// @include /^.*localhost.*\/index\.php(\/[0-9]{6}.*|\?r=.+)/
+// @include /^.*localhost.*\/index\.php(\/survey\/.*|\?r=.+)/
 // ==/UserScript==
 
 // Question type-specific classes; in element div.question-container
@@ -1156,7 +1158,7 @@ let SurveyTestHelper = {
     if (textElements) {
       for (let i = 0; i < textElements.length - 1; i++) {
         for (let i2 = i + 1; i2 < textElements.length; i2++) {
-          if (textElements[i].innerText.trim() == textElements[i2].innerText.trim()) {
+          if (textElements[i].innerText.trim().toLowerCase() == textElements[i2].innerText.trim().toLowerCase()) {
             textElements[i].style.border = ERROR_BORDER_STYLE;
             textElements[i2].style.border = ERROR_BORDER_STYLE;
 
@@ -1175,7 +1177,7 @@ let SurveyTestHelper = {
 
       for (let i = 0; i < textElements.length - 1; i++) {
         for (let i2 = i + 1; i2 < textElements.length; i2++) {
-          if (textElements[i].innerText.trim() == textElements[i2].innerText.trim()) {
+          if (textElements[i].innerText.trim().toLowerCase() == textElements[i2].innerText.trim().toLowerCase()) {
             textElements[i].style.border = ERROR_BORDER_STYLE;
             textElements[i2].style.border = ERROR_BORDER_STYLE;
 
