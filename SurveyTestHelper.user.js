@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name    Survey Test Helper
 // @author  Elliot Kwan
-// @version 2.33.3
+// @version 2.33.4
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -78,7 +78,7 @@ const STH_ALERTCODE = {
   numberOnlyTextValueMismatch: 9,
   questionTextKeywordNotFound: 10,
 };
-//Patterns that should be in both Q and A, if in Q
+// Patterns that should be in both Q and A, if in Q
 const QUESTION_TEXT_KEYWORDS = [
   "favor",
   "unfavor",
@@ -93,6 +93,14 @@ const QUESTION_TEXT_KEYWORDS = [
   "concern",
   "agree",
   "disagree",
+];
+const ANSWER_TEXT_KEYWORDS = [  // Patterns in all A's if in one
+  "favor",
+  "likely",
+];
+const MAGNITUDE_KEYWORDS = [
+  "more",
+  "less",
 ];
 const DEFAULT_ZIP = 90210;
 const ERROR_BORDER_STYLE = "red dashed 3px";
@@ -1308,11 +1316,10 @@ let SurveyTestHelper = {
       });
     });
 
-    let qTextContainer = this.questionContainer.querySelector("div.title");
     let errorKeywords = [];
     keywords.forEach((keyword) => {
       if (!keywordsInAns.get(keyword)) {
-        qTextContainer.innerHTML = qTextContainer.innerHTML.replaceAll(keyword, `<span class="sthError" style="border:${ERROR_BORDER_STYLE}">${keyword}</span>`);
+        this.questionContainer.innerHTML = this.questionContainer.innerHTML.replaceAll(keyword, `<span class="sthError" style="border:${ERROR_BORDER_STYLE}">${keyword}</span>`);
         errorKeywords.push(keyword);
       }
     });
@@ -1320,7 +1327,7 @@ let SurveyTestHelper = {
       this.addAlert(new Alert(STH_ALERTCODE.questionTextKeywordNotFound,
         `WARNING: "<span style="color:darkred;">${errorKeywords.join(', ')}</span>" found in question text but not in answer options.`));
     }
-    qTextContainer.querySelectorAll("span.sthError").forEach((e) => {
+    this.questionContainer.querySelectorAll("span.sthError").forEach((e) => {
       this.addAlertBorderElements(e);
     });
   },
