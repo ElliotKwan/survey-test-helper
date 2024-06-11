@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name    Survey Test Helper
 // @author  Elliot Kwan
-// @version 2.33.4
+// @version 2.33.5
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -77,6 +77,7 @@ const STH_ALERTCODE = {
   scaleTextMismatch: 8,
   numberOnlyTextValueMismatch: 9,
   questionTextKeywordNotFound: 10,
+  answerTextConsistencyFail: 11,
 };
 // Patterns that should be in both Q and A, if in Q
 const QUESTION_TEXT_KEYWORDS = [
@@ -86,6 +87,8 @@ const QUESTION_TEXT_KEYWORDS = [
   "oppose",
   "more likely",
   "less likely",
+  "very likely",
+  "unlikely",
   "strongly",
   "somewhat",
   "definitely",
@@ -101,6 +104,11 @@ const ANSWER_TEXT_KEYWORDS = [  // Patterns in all A's if in one
 const MAGNITUDE_KEYWORDS = [
   "more",
   "less",
+];
+const DK_REF_TEXT = [
+  "don't know",
+  "refused",
+  "prefer not to",
 ];
 const DEFAULT_ZIP = 90210;
 const ERROR_BORDER_STYLE = "red dashed 3px";
@@ -157,6 +165,7 @@ let SurveyTestHelper = {
         this.checkDuplicateText();
         this.checkScaleOptions();
         this.checkQuestionAnswerTextMatch();
+        this.checkAnswerTextConsistency();
         this.checkNumberOnlyValue();
 
         this.initQuestionInfoDisplay();
@@ -1294,6 +1303,7 @@ let SurveyTestHelper = {
   },
   checkQuestionAnswerTextMatch: function () {
     let questionText = this.getQuestionText().toLowerCase();
+    let qTextContainer = this.questionContainer.querySelector('.question-text');
     let textElements = this.getAnswerOptionTextElements();
     let keywords = [];
 
@@ -1319,13 +1329,70 @@ let SurveyTestHelper = {
     let errorKeywords = [];
     keywords.forEach((keyword) => {
       if (!keywordsInAns.get(keyword)) {
-        this.questionContainer.innerHTML = this.questionContainer.innerHTML.replaceAll(keyword, `<span class="sthError" style="border:${ERROR_BORDER_STYLE}">${keyword}</span>`);
+        qTextContainer.innerHTML = qTextContainer.innerHTML.replaceAll(keyword, `<span class="sthError" style="border:${ERROR_BORDER_STYLE}">${keyword}</span>`);
         errorKeywords.push(keyword);
       }
     });
     if (errorKeywords.length > 0) {
       this.addAlert(new Alert(STH_ALERTCODE.questionTextKeywordNotFound,
         `WARNING: "<span style="color:darkred;">${errorKeywords.join(', ')}</span>" found in question text but not in answer options.`));
+    }
+    this.questionContainer.querySelectorAll("span.sthError").forEach((e) => {
+      this.addAlertBorderElements(e);
+    });
+  },
+  checkAnswerTextConsistency: function () {
+    let textElements = this.getAnswerOptionTextElements();
+
+    if (!textElements) {
+      return;
+    }
+
+    let includedKeywords = new Map();
+    let numAns = 0;
+    // Find keywords that are included in the answer options and find the number of relevant answer options
+    for (let i = 0; i < textElements.length; i++) {
+      let iText = textElements[i].innerText.toLowerCase();
+      let isDKRef = false;
+
+      ANSWER_TEXT_KEYWORDS.forEach((keyword) => {
+        if (iText.includes(keyword)) {
+          includedKeywords.set(keyword, 0);
+        }
+      });
+
+      for (let j = 0; j < DK_REF_TEXT.length; j++) {
+        if (iText.includes(DK_REF_TEXT[j])) {
+          isDKRef = true;
+          break;
+        }
+      }
+      if (!isDKRef) {
+        numAns++;
+      }
+    }
+
+    // Find keywords that are included in some, but not in all (excluding don't know/refused options)
+    for (let i = 0; i < textElements.length; i++) {
+      let iText = textElements[i].innerText.toLowerCase();
+
+      includedKeywords.forEach((count, keyword) => {
+        if (iText.includes(keyword)) {
+          includedKeywords.set(keyword, count + 1);
+        }
+      });
+    }
+
+    let errorKeywords = [];
+    includedKeywords.forEach((count, keyword) => {
+      if (count !== numAns) {
+        errorKeywords.push(keyword);
+      }
+    });
+
+    if (errorKeywords.length > 0) {
+      this.addAlert(new Alert(STH_ALERTCODE.answerTextConsistencyFail,
+        `WARNING: "<span style="color:darkred;">${errorKeywords.join(', ')}</span>" found in an answer but may be missing in others.`));
     }
     this.questionContainer.querySelectorAll("span.sthError").forEach((e) => {
       this.addAlertBorderElements(e);
