@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name    Survey Test Helper
 // @author  Elliot Kwan
-// @version 2.33.5
+// @version 2.34.5
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -78,6 +78,7 @@ const STH_ALERTCODE = {
   numberOnlyTextValueMismatch: 9,
   questionTextKeywordNotFound: 10,
   answerTextConsistencyFail: 11,
+  recontactQuestion: 12,
 };
 // Patterns that should be in both Q and A, if in Q
 const QUESTION_TEXT_KEYWORDS = [
@@ -109,6 +110,32 @@ const DK_REF_TEXT = [
   "don't know",
   "refused",
   "prefer not to",
+];
+const RECONTACT_KEYWORDS = [
+  "your name",
+  "your first name",
+  "your first and last name",
+  "phone number",
+  "email address",
+  "e-mail address",
+  "follow-up call",
+  "follow-up email",
+  "follow-up study",
+  "follow-up research study",
+  "follow-up interview",
+  "contact you",
+  "be re-contacted",
+  "be recontacted",
+  "be recontacting",
+  "be re-contacting",
+  "focus group",
+  "contacted to participate",
+  "invited to participate",
+  "interested in receiving",
+  "interested in participating",
+  "your contact information",
+  "being contacted",
+  "be contacted",
 ];
 const DEFAULT_ZIP = 90210;
 const ERROR_BORDER_STYLE = "red dashed 3px";
@@ -167,6 +194,7 @@ let SurveyTestHelper = {
         this.checkQuestionAnswerTextMatch();
         this.checkAnswerTextConsistency();
         this.checkNumberOnlyValue();
+        this.checkRecontact();
 
         this.initQuestionInfoDisplay();
       }, this);
@@ -379,9 +407,31 @@ let SurveyTestHelper = {
   addAlertBorderElements: function () {
     for (let i = 0; i < arguments.length; i++) {
       if (!this.alertBorderElements.includes(arguments[i])) {
+        arguments[i].style.border = ERROR_BORDER_STYLE;
         this.alertBorderElements.push(arguments[i]);
       }
     }
+  },
+  addCautionElements: function () {
+    let curElement, ogBgColour;
+
+    for (let i = 0; i < arguments.length; i++) {
+      if (!this.alertBorderElements.includes(arguments[i])) {
+        curElement = arguments[i];
+
+        curElement.style.transitionDuration = '0.5s';
+        ogBgColour = curElement.style.backgroundColor;
+        curElement.ontransitionend = () => {
+          curElement.style.backgroundColor = ogBgColour;
+          curElement.style.transitionDuration = 0;
+        };
+        window.setTimeout(() => {
+          curElement.style.backgroundColor = "#FF0000";
+        }, 100);
+      }
+    }
+
+    this.addAlertBorderElements(...arguments);
   },
   displayAlerts: function () {
     window.setTimeout (function () {
@@ -899,11 +949,11 @@ let SurveyTestHelper = {
     let rows = arrayTable.querySelectorAll(".answers-list");
     let options, r;
     rows.forEach(row => {
-      options = row.querySelectorAll("td>input.radio");
+      options = [...row.querySelectorAll("td>input.radio")];
+      options = options.filter((e) => !isHidden(e));
       r = roll(0, options.length);
-      if (!isHidden(options[r])) {
-      	options[r].checked = true;
-      }
+
+      options[r].checked = true;
     });
   },
   inputMultipleChoiceOptions: function () {
@@ -1165,6 +1215,7 @@ let SurveyTestHelper = {
     let mandatoryAsterisk = this.questionContainer.querySelector("div.question-text>span.text-danger.asterisk");
 
     if (this.getQuestionType() && !mandatoryAsterisk) {
+      this.addCautionElements(this.questionContainer);
       this.addAlert(new Alert(STH_ALERTCODE.unexpectedNonMandatory,
         `WARNING: Non-mandatory question detected (<span style="color:darkred;">${this.questionCode}</span>).`));
     }
@@ -1176,9 +1227,6 @@ let SurveyTestHelper = {
       for (let i = 0; i < textElements.length - 1; i++) {
         for (let i2 = i + 1; i2 < textElements.length; i2++) {
           if (textElements[i].innerText.trim().toLowerCase() == textElements[i2].innerText.trim().toLowerCase()) {
-            textElements[i].style.border = ERROR_BORDER_STYLE;
-            textElements[i2].style.border = ERROR_BORDER_STYLE;
-
             this.addAlertBorderElements(textElements[i], textElements[i2]);
 
             this.addAlert(new Alert(STH_ALERTCODE.duplicateAnswer,
@@ -1195,9 +1243,6 @@ let SurveyTestHelper = {
       for (let i = 0; i < textElements.length - 1; i++) {
         for (let i2 = i + 1; i2 < textElements.length; i2++) {
           if (textElements[i].innerText.trim().toLowerCase() == textElements[i2].innerText.trim().toLowerCase()) {
-            textElements[i].style.border = ERROR_BORDER_STYLE;
-            textElements[i2].style.border = ERROR_BORDER_STYLE;
-
             this.addAlertBorderElements(textElements[i], textElements[i2]);
 
             this.addAlert(new Alert(STH_ALERTCODE.duplicateText,
@@ -1205,6 +1250,24 @@ let SurveyTestHelper = {
           }
         }
       }
+    }
+  },
+  checkRecontact: function () {
+
+    let questionText = this.getQuestionText().toLowerCase();
+    let detected = false;
+
+    for (let i = 0; i < RECONTACT_KEYWORDS.length; i++) {
+      if (questionText.includes(RECONTACT_KEYWORDS[i])) {
+        detected = true;
+        break;
+      }
+    };
+
+    if (detected) {
+      this.addCautionElements(this.questionContainer);
+      this.addAlert(new Alert(STH_ALERTCODE.recontactQuestion,
+        `WARNING: Re-contact question detected. If re-contact question, contact DeltaField.`));
     }
   },
   isAnswered: function () {
@@ -1279,7 +1342,6 @@ let SurveyTestHelper = {
 
           if (numOnly.test(text) && Number(text) !== Number(value)) {
             this.addAlertBorderElements(e);
-            e.style.border = ERROR_BORDER_STYLE;
             this.addAlert(new Alert(STH_ALERTCODE.numberOnlyTextValueMismatch,
               `WARNING: Numeric answer option does not match its code.`));
           }
@@ -1293,7 +1355,6 @@ let SurveyTestHelper = {
           let value = firstRowCells[i].value;
           if (numOnly.test(text) && Number(text) !== Number(value)) {
             this.addAlertBorderElements(e);
-            e.style.border = ERROR_BORDER_STYLE;
             this.addAlert(new Alert(STH_ALERTCODE.numberOnlyTextValueMismatch,
               `WARNING: Numeric answer option does not match its code.`));
           }
