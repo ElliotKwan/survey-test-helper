@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name    Survey Test Helper
 // @author  Elliot Kwan
-// @version 2.34.5
+// @version 2.34.6
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -946,11 +946,13 @@ let SurveyTestHelper = {
   },
   inputArrayOptions: function () {
     let arrayTable = this.questionContainer.querySelector("table.questions-list");
-    let rows = arrayTable.querySelectorAll(".answers-list");
+    let rows = [...arrayTable.querySelectorAll(".answers-list")];
     let options, r;
+
+    rows = rows.filter((row) => !isHidden(row));
     rows.forEach(row => {
       options = [...row.querySelectorAll("td>input.radio")];
-      options = options.filter((e) => !isHidden(e));
+      options = options.filter((opt) => !isHidden(opt));
       r = roll(0, options.length);
 
       options[r].checked = true;
