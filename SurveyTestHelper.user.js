@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name    Survey Test Helper
 // @author  Elliot Kwan
-// @version 2.34.6
+// @version 2.34.8
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -1366,12 +1366,16 @@ let SurveyTestHelper = {
   },
   checkQuestionAnswerTextMatch: function () {
     let questionText = this.getQuestionText().toLowerCase();
-    let qTextContainer = this.questionContainer.querySelector('.question-text');
+    let qTextContainer = this.questionContainer.querySelector('.question-text > div.title');
     let textElements = this.getAnswerOptionTextElements();
     let keywords = [];
 
     if (!textElements) {
       return;
+    }
+
+    if (!qTextContainer) {
+      qTextContainer = this.questionContainer.querySelector('.question-text');
     }
 
     QUESTION_TEXT_KEYWORDS.forEach((keyword) => {
