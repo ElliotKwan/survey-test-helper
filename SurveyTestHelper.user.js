@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name    Survey Test Helper
 // @author  Elliot Kwan
-// @version 2.34.8
+// @version 2.34.9
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -23,6 +23,7 @@ const QUESTION_CLASSES = {
   "text-long": 8,
   "multiple-short-txt": 9,
   "text-huge": 10,
+  "boilerplate": 11,
 };
 const QUESTION_TYPE = {
   radio: 1,
@@ -35,6 +36,7 @@ const QUESTION_TYPE = {
   longFreeText: 8,
   multipleShortFreeText: 9,
   textHuge: 10,
+  textDisplay: 11,
 };
 const BUTTON_CODES = {
   right: 39,
@@ -1214,6 +1216,10 @@ let SurveyTestHelper = {
     }
   },
   checkMandatory: function () {
+    if (this.questionType === QUESTION_TYPE.textDisplay) {
+      return;
+    }
+
     let mandatoryAsterisk = this.questionContainer.querySelector("div.question-text>span.text-danger.asterisk");
 
     if (this.getQuestionType() && !mandatoryAsterisk) {
@@ -1255,6 +1261,9 @@ let SurveyTestHelper = {
     }
   },
   checkRecontact: function () {
+    if (this.questionType === QUESTION_TYPE.textDisplay) {
+      return;
+    }
 
     let questionText = this.getQuestionText().toLowerCase();
     let detected = false;
