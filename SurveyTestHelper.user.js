@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name    Survey Test Helper
 // @author  Elliot Kwan
-// @version 2.34.9
+// @version 2.34.10
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -118,6 +118,9 @@ const RECONTACT_KEYWORDS = [
   "your first name",
   "your first and last name",
   "phone number",
+  "best phone number",
+  "your email",
+  "your e-mail",
   "email address",
   "e-mail address",
   "follow-up call",
@@ -138,6 +141,11 @@ const RECONTACT_KEYWORDS = [
   "your contact information",
   "being contacted",
   "be contacted",
+  "may we share your",
+  "can we share your",
+  "gift",
+  "incentive",
+  "provide you with information",
 ];
 const DEFAULT_ZIP = 90210;
 const ERROR_BORDER_STYLE = "red dashed 3px";
