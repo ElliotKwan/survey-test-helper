@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name    Survey Test Helper
 // @author  Elliot Kwan
-// @version 2.34.10
+// @version 2.35.0
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -9,6 +9,7 @@
 // @include /^https?:\/\/.+\.(com|net)\/index\.php(\/[0-9]{6}.*|\?r=.+)/
 // @include /^.*localhost.*\/index\.php(\/[0-9]{6}.*|\?r=.+)/
 // @include /^.*localhost.*\/index\.php(\/survey\/.*|\?r=.+)/
+// @include /^.*admin/expressions/sa/survey_logic_file/sid/[0-9]{6}$/
 // ==/UserScript==
 
 // Question type-specific classes; in element div.question-container
@@ -179,53 +180,97 @@ let SurveyTestHelper = {
   errorAlertShown: false,
   alerts:[],
   initialize: function () {
-    console.log("Initializing...");
+    let questionTexts = [...document.querySelectorAll('tr.LEMquestion, tr.LEMsubq')];
+    if (questionTexts.length > 0) {
+      console.log("Initializing Duplicate Question Text Detector...");
 
-    this.addErrorAlertListener();
-    this.commands = this.queryCommands();
+      questionTexts = questionTexts.map(qrow => {
+        if (qrow.children[1].innerText.endsWith('_other')) {
+          return 'other';
+        }
+        return qrow.children[3].innerText.split('\n')[0].split(`[\.{}]`)[0].replaceAll(`[^a-zA-Z\d]`, '');
+      });
+      questionTexts = questionTexts.filter((qtext) => qtext !== 'other');
+      let dupes = [];
+      for (let x = 0, qtext; x < questionTexts.length;) {
+        qtext = questionTexts.shift();
+        console.log(qtext);
+        if (questionTexts.includes(qtext)) {
+          if (dupes.includes(qtext)) {
+            // do something
+          } else {
+            dupes.push(qtext);
+          }
+        }
+      }
 
-    this.initStorage();
-
-    this.initUI();
-
-    // Iterate through all question containers
-    let qContainers = document.querySelectorAll("div.question-container");
-    if (qContainers.length) {
-      qContainers.forEach(qContainer => {
-        this.questionContainer = qContainer;  // Reference to current questions container for other functions to access
-        this.questionType = this.getQuestionType(qContainer);
-        this.questionCode = qContainer.querySelector("span#QNameNumData");
-        this.questionCode = this.questionCode ? this.questionCode.dataset.code : "Main Survey Page";
-
-        // Highlight potential errors
-        this.checkMandatory();
-        this.checkDuplicateText();
-        this.checkScaleOptions();
-        this.checkQuestionAnswerTextMatch();
-        this.checkAnswerTextConsistency();
-        this.checkNumberOnlyValue();
-        this.checkRecontact();
-
-        this.initQuestionInfoDisplay();
-      }, this);
+      if (dupes.length > 0) {
+        const dupeDetectorUI = document.createElement('div');
+        dupeDetectorUI.innerHTML = `<b>Duplicate text found</b>:<br>${dupes.join('<br>')}`;
+        dupeDetectorUI.style.position = 'fixed';
+        dupeDetectorUI.style.right = '3em';
+        dupeDetectorUI.style.top = '10em';
+        dupeDetectorUI.style['background-color'] = 'rgba(255,255,255)';
+        dupeDetectorUI.style.padding = '3px';
+        dupeDetectorUI.style['border-radius'] = '5px';
+        dupeDetectorUI.style['transition-duration'] = '0.5s';
+        dupeDetectorUI.addEventListener('transitionend', () => {
+          dupeDetectorUI.style['background-color'] = 'rgba(255,255,255,0.6)';
+        });
+        setTimeout(() => {
+          dupeDetectorUI.style['background-color'] = 'red';
+        }, 200);
+        document.body.appendChild(dupeDetectorUI);
+      }
     } else {
-      this.questionCode = "Main Survey Page";
-      this.initQuestionInfoDisplay();
-    }
+      console.log("Initializing Survey Test Helper...");
 
-    // Attach handlers
-    this.button.onclick = this.buttonActionHandler.bind(this);
-    document.onkeydown = this.buttonActionHandler.bind(this);
+      this.addErrorAlertListener();
+      this.commands = this.queryCommands();
 
-    document.body.appendChild(this.uiContainer);
+      this.initStorage();
 
-    if(document.querySelector("button#movenextbtn") && !this.hidden){
-      document.querySelector("button#movenextbtn").disabled = false;
-    }
+      this.initUI();
 
-    if (this.active) {
-      this.enterDummyResponses();
-      this.clickNextButton();
+      // Iterate through all question containers
+      let qContainers = document.querySelectorAll("div.question-container");
+      if (qContainers.length) {
+        qContainers.forEach(qContainer => {
+          this.questionContainer = qContainer;  // Reference to current questions container for other functions to access
+          this.questionType = this.getQuestionType(qContainer);
+          this.questionCode = qContainer.querySelector("span#QNameNumData");
+          this.questionCode = this.questionCode ? this.questionCode.dataset.code : "Main Survey Page";
+
+          // Highlight potential errors
+          this.checkMandatory();
+          this.checkDuplicateText();
+          this.checkScaleOptions();
+          this.checkQuestionAnswerTextMatch();
+          this.checkAnswerTextConsistency();
+          this.checkNumberOnlyValue();
+          this.checkRecontact();
+
+          this.initQuestionInfoDisplay();
+        }, this);
+      } else {
+        this.questionCode = "Main Survey Page";
+        this.initQuestionInfoDisplay();
+      }
+
+      // Attach handlers
+      this.button.onclick = this.buttonActionHandler.bind(this);
+      document.onkeydown = this.buttonActionHandler.bind(this);
+
+      document.body.appendChild(this.uiContainer);
+
+      if(document.querySelector("button#movenextbtn") && !this.hidden){
+        document.querySelector("button#movenextbtn").disabled = false;
+      }
+
+      if (this.active) {
+        this.enterDummyResponses();
+        this.clickNextButton();
+      }
     }
   },
   initUI: function () {
