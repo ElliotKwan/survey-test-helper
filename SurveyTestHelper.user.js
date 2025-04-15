@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name    Survey Test Helper
 // @author  Elliot Kwan
-// @version 2.35.0
+// @version 2.35.6
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -9,7 +9,7 @@
 // @include /^https?:\/\/.+\.(com|net)\/index\.php(\/[0-9]{6}.*|\?r=.+)/
 // @include /^.*localhost.*\/index\.php(\/[0-9]{6}.*|\?r=.+)/
 // @include /^.*localhost.*\/index\.php(\/survey\/.*|\?r=.+)/
-// @include /^.*admin/expressions/sa/survey_logic_file/sid/[0-9]{6}$/
+// @include /^.*admin/expressions/sa/survey_logic_file/sid/[0-9]{6}(/lang/.+)*$/
 // ==/UserScript==
 
 // Question type-specific classes; in element div.question-container
@@ -183,45 +183,7 @@ let SurveyTestHelper = {
     let questionTexts = [...document.querySelectorAll('tr.LEMquestion, tr.LEMsubq')];
     if (questionTexts.length > 0) {
       console.log("Initializing Duplicate Question Text Detector...");
-
-      questionTexts = questionTexts.map(qrow => {
-        if (qrow.children[1].innerText.endsWith('_other')) {
-          return 'other';
-        }
-        return qrow.children[3].innerText.split('\n')[0].split(`[\.{}]`)[0].replaceAll(`[^a-zA-Z\d]`, '');
-      });
-      questionTexts = questionTexts.filter((qtext) => qtext !== 'other');
-      let dupes = [];
-      for (let x = 0, qtext; x < questionTexts.length;) {
-        qtext = questionTexts.shift();
-        console.log(qtext);
-        if (questionTexts.includes(qtext)) {
-          if (dupes.includes(qtext)) {
-            // do something
-          } else {
-            dupes.push(qtext);
-          }
-        }
-      }
-
-      if (dupes.length > 0) {
-        const dupeDetectorUI = document.createElement('div');
-        dupeDetectorUI.innerHTML = `<b>Duplicate text found</b>:<br>${dupes.join('<br>')}`;
-        dupeDetectorUI.style.position = 'fixed';
-        dupeDetectorUI.style.right = '3em';
-        dupeDetectorUI.style.top = '10em';
-        dupeDetectorUI.style['background-color'] = 'rgba(255,255,255)';
-        dupeDetectorUI.style.padding = '3px';
-        dupeDetectorUI.style['border-radius'] = '5px';
-        dupeDetectorUI.style['transition-duration'] = '0.5s';
-        dupeDetectorUI.addEventListener('transitionend', () => {
-          dupeDetectorUI.style['background-color'] = 'rgba(255,255,255,0.6)';
-        });
-        setTimeout(() => {
-          dupeDetectorUI.style['background-color'] = 'red';
-        }, 200);
-        document.body.appendChild(dupeDetectorUI);
-      }
+      this.createDupeDetector(questionTexts);
     } else {
       console.log("Initializing Survey Test Helper...");
 
@@ -1527,6 +1489,123 @@ let SurveyTestHelper = {
       this.addAlertBorderElements(e);
     });
   },
+  createDupeDetector: function (qtexts) {
+    const firstSentenceSeparatorRegex = /[\n\.]/;
+    questionTexts = qtexts.map(qrow => {
+      return {
+        code: qrow.children[1].querySelector('b').innerText.replace('*', ''),
+        text: qrow.children[3].innerText.split(firstSentenceSeparatorRegex)[0].replaceAll(/[^a-zA-Z\d]/g, ''),
+        ogText: qrow.children[3].innerText.split(firstSentenceSeparatorRegex)[0],
+        type: qrow.children[1].innerText.split('\n').pop(),
+        prevRow: qrow.previousElementSibling,
+        nextRow: qrow.nextElementSibling,
+        hidden: qrow.children[3].innerText.includes('hidden\t1'),
+      };
+    });
+    // Remove precodes
+    if (questionTexts[0].prevRow.classList.contains('LEMgroup') && questionTexts[0].prevRow.innerText.includes('Precodes')) {
+      do {
+        questionTexts.shift();
+      } while (!questionTexts[0].prevRow.classList.contains('LEMgroup') && questionTexts.length > 0);
+    }
+    // Remove backpage
+    for (let i = 0; i < questionTexts.length;) {
+      if (questionTexts[i].prevRow.classList.contains('LEMgroup') && (questionTexts[i].prevRow.innerText.includes('ackpage') || questionTexts[i].prevRow.innerText.includes('rosstab'))) {
+        questionTexts.pop();
+      } else {
+        i++;
+      }
+    }
+    // Remove hidden questions
+    for (let i = 0; i < questionTexts.length;) {
+      if (questionTexts[i].hidden) {
+        if (questionTexts[i].type.includes('[F]') || questionTexts[i].type.includes('[M]')) {
+          let j = 0;
+          while (questionTexts[i + j].nextRow.classList.contains('LEMsubq')) {
+            j++;
+          }
+          questionTexts.splice(i, j + 1);
+        } else {
+          questionTexts.splice(i, 1);
+        }
+      } else {
+        i++;
+      }
+    }
+    // Remove other options
+    questionTexts = questionTexts.filter(qtext => !qtext.code.endsWith('_other'));
+    // Remove equations
+    questionTexts = questionTexts.filter(qtext => !qtext.type.includes('[*]'));
+    let dupes = [];
+    while (questionTexts.length > 0) {
+      qtext = questionTexts.shift();
+      let foundDupe = questionTexts.find(text => text.text == qtext.text);
+      if (foundDupe) {
+        let handledDupe = dupes.find(text => text.text == foundDupe.text);
+        if (handledDupe) {
+          // Only append the code stuff if extra dupes are found
+          handledDupe.code += `, ${foundDupe.code}`;
+        } else {
+          qtext.code += `, ${foundDupe.code}`;
+          dupes.push(qtext);
+        }
+      }
+    }
+
+    dupes = dupes.filter(dupe => dupe.text.trim() !== '');
+
+    if (dupes.length > 0) {
+      const dupeDetectorUI = document.createElement('div');
+      let ddHidden = false;
+      const initialTop = '55px';
+      dupeDetectorUI.innerHTML = `<b>Duplicate text found</b>:<ul>${dupes.reduce((acc, cur) => acc + `<li><b>${cur.code}</b>: ${cur.ogText}</li>`, '')}</ul>`;
+      dupeDetectorUI.style.position = 'fixed';
+      dupeDetectorUI.style.left = 'auto';
+      dupeDetectorUI.style.right = '3em';
+      dupeDetectorUI.style.top = initialTop;
+      dupeDetectorUI.style['max-width'] = '70%';
+      dupeDetectorUI.style['max-height'] = '40%';
+      dupeDetectorUI.style['background-color'] = 'rgba(255,255,255)';
+      dupeDetectorUI.style.padding = '3px';
+      dupeDetectorUI.style['border-radius'] = '5px';
+      dupeDetectorUI.style.overflow = 'visible scroll';
+      dupeDetectorUI.style.zIndex = '9999';
+      dupeDetectorUI.style['transition-duration'] = '0.5s';
+      dupeDetectorUI.addEventListener('transitionend', () => {
+        dupeDetectorUI.style['background-color'] = 'rgba(255,255,255,0.95)';
+      });
+
+      const hideBtn = document.createElement('button');
+      hideBtn.style.position = 'fixed';
+      hideBtn.innerText = '^';
+      hideBtn.style.width = '70px';
+      hideBtn.style.height = '30px';
+      hideBtn.style.left = '50%';
+      hideBtn.style.top = '0%';
+      hideBtn.style.color = 'white';
+      hideBtn.style['background-color'] = 'red';
+      hideBtn.style['border-radius'] = '0 0 8px 8px';
+      hideBtn.style.border = 'none';
+
+      dupeDetectorUI.append(hideBtn);
+
+      hideBtn.onclick = (e) => {
+        if (!ddHidden) {
+          hideBtn.innerText = 'v';
+          dupeDetectorUI.style.top = '-100%';
+        } else {
+          hideBtn.innerText = '^';
+          dupeDetectorUI.style.top = initialTop;
+        }
+        ddHidden = !ddHidden;
+      };
+
+      setTimeout(() => {
+        dupeDetectorUI.style['background-color'] = 'red';
+      }, 200);
+      document.body.appendChild(dupeDetectorUI);
+    }
+  }
 };
 
 function roll (min, max) {
