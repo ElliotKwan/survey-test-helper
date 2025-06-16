@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name    Survey Test Helper
 // @author  Elliot Kwan
-// @version 2.35.6
+// @version 2.35.8
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
@@ -82,6 +82,7 @@ const STH_ALERTCODE = {
   questionTextKeywordNotFound: 10,
   answerTextConsistencyFail: 11,
   recontactQuestion: 12,
+  maxLengthDetected: 13,
 };
 // Patterns that should be in both Q and A, if in Q
 const QUESTION_TEXT_KEYWORDS = [
@@ -211,6 +212,7 @@ let SurveyTestHelper = {
           this.checkAnswerTextConsistency();
           this.checkNumberOnlyValue();
           this.checkRecontact();
+          this.checkSFTMaxLengthValidity();
 
           this.initQuestionInfoDisplay();
         }, this);
@@ -473,6 +475,10 @@ let SurveyTestHelper = {
   },
   clickNextButton: function () {
     let nextBtn = document.querySelector("#movenextbtn") || document.querySelector("#movesubmitbtn");
+
+    if (!this.checkSFTMaxLengthValidity()) {
+      return;
+    }
 
     if (nextBtn) {
       nextBtn.click();
@@ -1483,11 +1489,27 @@ let SurveyTestHelper = {
 
     if (errorKeywords.length > 0) {
       this.addAlert(new Alert(STH_ALERTCODE.answerTextConsistencyFail,
-        `WARNING: "<span style="color:darkred;">${errorKeywords.join(', ')}</span>" found in an answer but may be missing in others.`));
+        `WARNING: "<span style="color:darkred;">${errorKeywords.join(', ')}</span>" found in an answer but may be missing in others.`)
+      );
     }
     this.questionContainer.querySelectorAll("span.sthError").forEach((e) => {
       this.addAlertBorderElements(e);
     });
+  },
+  checkSFTMaxLengthValidity: function () {
+    // Return true if valid, false otherwise
+    const inputElement = this.questionContainer.querySelector("input.text");
+
+    if (inputElement && this.getQuestionType() === QUESTION_TYPE.shortFreeText && inputElement.maxLength >= 0) {
+      this.addAlert(new Alert(STH_ALERTCODE.maxLengthDetected,
+        `WARNING: Question input has a maxLength value of "<span style="color:darkred;">${inputElement.maxLength}</span>".`)
+      );
+      // Return value determines 'auto-next' pathing. TODO: Change if time permits
+      return !(inputElement.value.length > inputElement.maxLength);
+    }
+
+    // Valid by default
+    return true;
   },
   createDupeDetector: function (qtexts) {
     const firstSentenceSeparatorRegex = /[\n\.]/;
