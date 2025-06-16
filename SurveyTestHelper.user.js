@@ -1498,7 +1498,7 @@ let SurveyTestHelper = {
   },
   checkSFTMaxLengthValidity: function () {
     // Return true if valid, false otherwise
-    const inputElement = this.questionContainer.querySelector("input.text");
+    const inputElement = this.questionContainer?.querySelector("input.text");
 
     if (inputElement && this.getQuestionType() === QUESTION_TYPE.shortFreeText && inputElement.maxLength >= 0) {
       this.addAlert(new Alert(STH_ALERTCODE.maxLengthDetected,
