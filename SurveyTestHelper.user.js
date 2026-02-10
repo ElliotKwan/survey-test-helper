@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name    Survey Test Helper
 // @author  Elliot Kwan
-// @version 2.35.8
+// @version 2.35.9
 // @grant   none
 // @locale  en
 // @description A tool to help with survey testing
